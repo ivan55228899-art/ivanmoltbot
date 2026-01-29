@@ -7,15 +7,14 @@ const config = {
   channelSecret: process.env.CHANNEL_SECRET,
 };
 
-// 建立 Express App
 const app = express();
 
-// 初始化 Gemini (確保有 API KEY)
+// 初始化 Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// 改用最新的 Flash 模型，速度快且便宜
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// 處理 Webhook (POST /callback)
+// ★★★ 關鍵修改：使用 gemini-pro，它是目前最穩定的模型名稱 ★★★
+const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+
 app.post('/callback', line.middleware(config), (req, res) => {
   Promise
     .all(req.body.events.map(handleEvent))
@@ -26,7 +25,6 @@ app.post('/callback', line.middleware(config), (req, res) => {
     });
 });
 
-// 根目錄Fallback (防止誤連)
 app.post('/', line.middleware(config), (req, res) => {
   Promise
     .all(req.body.events.map(handleEvent))
@@ -37,12 +35,10 @@ app.post('/', line.middleware(config), (req, res) => {
     });
 });
 
-// 健康檢查
 app.get('/', (req, res) => {
-  res.send('LINE Gemini Bot (Flash) is running!');
+  res.send('LINE Gemini Bot is running!');
 });
 
-// 事件處理主程式
 async function handleEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
     return Promise.resolve(null);
@@ -51,22 +47,21 @@ async function handleEvent(event) {
   const client = new line.Client(config);
 
   try {
-    // 這裡我們直接把使用者的訊息傳給 Gemini
-    // 如果想要有「記憶」功能，需要更複雜的資料庫，目前先做單次問答
+    // 呼叫 Gemini
     const result = await model.generateContent(event.message.text);
-    const responseText = result.response.text();
+    const response = await result.response;
+    const text = response.text();
 
-    // 回覆 LINE
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: responseText
+      text: text
     });
 
   } catch (error) {
     console.error('Gemini Error:', error);
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: '抱歉，AI 目前有點忙碌，請稍後再試。'
+      text: '抱歉，AI 暫時無法回應。請檢查 Log。'
     });
   }
 }
