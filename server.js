@@ -1,6 +1,6 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
-const fetch = require('node-fetch'); // Render 的 Node 環境通常內建 fetch，但為了保險我們用原生 fetch
+// 刪除了 const fetch = ... 因為 Node.js 18 以上已經內建 fetch 了
 
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -42,10 +42,10 @@ async function handleEvent(event) {
   
   // 使用您設定的 API Key
   const apiKey = process.env.GEMINI_API_KEY;
-  // 我們直接指定 API 網址，不做任何縮寫
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   try {
+    // 使用 Node.js 內建的 fetch
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -62,7 +62,6 @@ async function handleEvent(event) {
 
     const data = await response.json();
 
-    // 如果 Google 回傳錯誤，印出來看
     if (!response.ok) {
       console.error('Gemini API Error:', JSON.stringify(data, null, 2));
       return client.replyMessage(event.replyToken, {
@@ -71,7 +70,14 @@ async function handleEvent(event) {
       });
     }
 
-    // 取得 AI 回覆
+    // 檢查是否有回傳內容
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+       return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: 'AI 沒有回傳任何內容，可能被安全過濾器擋住了。'
+      });
+    }
+
     const aiText = data.candidates[0].content.parts[0].text;
 
     return client.replyMessage(event.replyToken, {
@@ -83,10 +89,9 @@ async function handleEvent(event) {
     console.error('Network Error:', error);
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: '系統錯誤，請稍後再試。'
+      text: '系統錯誤，請檢查 Log。'
     });
   }
 }
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Listening on ${port}`));
