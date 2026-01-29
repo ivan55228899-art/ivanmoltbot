@@ -8,12 +8,10 @@ const config = {
 };
 
 const app = express();
-
-// 初始化 Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ★ 改用 gemini-1.5-flash，這是目前 Google 最推薦且支援度最高的模型
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// 我們改用最通用的 gemini-pro，搭配新的一把 Key
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 app.post('/callback', line.middleware(config), async (req, res) => {
   try {
@@ -36,7 +34,7 @@ app.post('/', line.middleware(config), async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('LINE Gemini Bot (Flash) is running!');
+  res.send('LINE Bot (Gemini Pro) is ready.');
 });
 
 async function handleEvent(event) {
@@ -47,6 +45,7 @@ async function handleEvent(event) {
   const client = new line.Client(config);
 
   try {
+    // 這裡不做太複雜的設定，直接送出
     const result = await model.generateContent(event.message.text);
     const response = await result.response;
     const text = response.text();
@@ -58,10 +57,9 @@ async function handleEvent(event) {
 
   } catch (error) {
     console.error('Gemini Error:', error);
-    // 這裡我們把錯誤印出來給你看，如果再錯就知道原因了
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: 'AI 連線失敗，請檢查 Render Logs。'
+      text: 'AI 連線失敗。請確認 API Key 是否為 Google AI Studio 新建立的。'
     });
   }
 }
