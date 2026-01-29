@@ -7,12 +7,15 @@ const config = {
   channelSecret: process.env.CHANNEL_SECRET,
 };
 
-// 設定 Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro"});
-
+// 建立 Express App
 const app = express();
 
+// 初始化 Gemini (確保有 API KEY)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 改用最新的 Flash 模型，速度快且便宜
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// 處理 Webhook (POST /callback)
 app.post('/callback', line.middleware(config), (req, res) => {
   Promise
     .all(req.body.events.map(handleEvent))
@@ -23,6 +26,7 @@ app.post('/callback', line.middleware(config), (req, res) => {
     });
 });
 
+// 根目錄Fallback (防止誤連)
 app.post('/', line.middleware(config), (req, res) => {
   Promise
     .all(req.body.events.map(handleEvent))
@@ -33,39 +37,26 @@ app.post('/', line.middleware(config), (req, res) => {
     });
 });
 
+// 健康檢查
 app.get('/', (req, res) => {
-  res.send('LINE Gemini Bot is running!');
+  res.send('LINE Gemini Bot (Flash) is running!');
 });
 
+// 事件處理主程式
 async function handleEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
     return Promise.resolve(null);
   }
 
   const client = new line.Client(config);
-  
-  try {
-    // 1. 顯示載入動畫 (如果需要的話，可選)
-    // await client.showLoadingAnimation(event.chatId); 
 
-    // 2. 呼叫 Gemini
-    const chat = model.startChat({
-        history: [
-            {
-                role: "user",
-                parts: [{ text: "你現在是一個有用的 AI 助手。請用繁體中文回答。" }],
-            },
-            {
-                role: "model",
-                parts: [{ text: "好的，我會用繁體中文為您服務。" }],
-            },
-        ],
-    });
-    
-    const result = await chat.sendMessage(event.message.text);
+  try {
+    // 這裡我們直接把使用者的訊息傳給 Gemini
+    // 如果想要有「記憶」功能，需要更複雜的資料庫，目前先做單次問答
+    const result = await model.generateContent(event.message.text);
     const responseText = result.response.text();
 
-    // 3. 回覆使用者
+    // 回覆 LINE
     return client.replyMessage(event.replyToken, {
       type: 'text',
       text: responseText
@@ -75,7 +66,7 @@ async function handleEvent(event) {
     console.error('Gemini Error:', error);
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: '抱歉，我現在有點累（AI 連線錯誤），請稍後再試。'
+      text: '抱歉，AI 目前有點忙碌，請稍後再試。'
     });
   }
 }
