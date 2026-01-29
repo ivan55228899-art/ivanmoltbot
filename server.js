@@ -12,31 +12,31 @@ const app = express();
 // 初始化 Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ★★★ 關鍵修改：使用 gemini-pro，它是目前最穩定的模型名稱 ★★★
-const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+// ★ 改用 gemini-1.5-flash，這是目前 Google 最推薦且支援度最高的模型
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-app.post('/callback', line.middleware(config), (req, res) => {
-  Promise
-    .all(req.body.events.map(handleEvent))
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error(err);
-      res.status(500).end();
-    });
+app.post('/callback', line.middleware(config), async (req, res) => {
+  try {
+    const result = await Promise.all(req.body.events.map(handleEvent));
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
+  }
 });
 
-app.post('/', line.middleware(config), (req, res) => {
-  Promise
-    .all(req.body.events.map(handleEvent))
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error(err);
-      res.status(500).end();
-    });
+app.post('/', line.middleware(config), async (req, res) => {
+  try {
+    const result = await Promise.all(req.body.events.map(handleEvent));
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
+  }
 });
 
 app.get('/', (req, res) => {
-  res.send('LINE Gemini Bot is running!');
+  res.send('LINE Gemini Bot (Flash) is running!');
 });
 
 async function handleEvent(event) {
@@ -47,7 +47,6 @@ async function handleEvent(event) {
   const client = new line.Client(config);
 
   try {
-    // 呼叫 Gemini
     const result = await model.generateContent(event.message.text);
     const response = await result.response;
     const text = response.text();
@@ -59,9 +58,10 @@ async function handleEvent(event) {
 
   } catch (error) {
     console.error('Gemini Error:', error);
+    // 這裡我們把錯誤印出來給你看，如果再錯就知道原因了
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: '抱歉，AI 暫時無法回應。請檢查 Log。'
+      text: 'AI 連線失敗，請檢查 Render Logs。'
     });
   }
 }
